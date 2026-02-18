@@ -8,6 +8,7 @@ export class DaySimulation {
     this.clock = new SimClock()
     this.currentAction = null
     this.lastReward = null
+    this.lastSale = null
     this.dayLog = []
   }
 
@@ -33,6 +34,7 @@ export class DaySimulation {
     this.state = 'fishing'
     const result = this.environment.step(this.currentAction)
     this.lastReward = result.reward
+    this.lastSale = null
 
     // Advance clock to 8 PM (from 10 AM)
     // From 10 AM to 8 PM is 10 hours * 60 minutes = 600 minutes
@@ -48,8 +50,10 @@ export class DaySimulation {
 
     this.state = 'selling'
 
+    this.lastSale = this.environment.sellCatch(this.lastReward)
+
     // Agent learns from the experience
-    this.agent.learn(this.currentAction, this.lastReward)
+    this.agent.learn(this.currentAction, this.lastSale.revenue)
 
     // End the episode (decays epsilon, increments episode)
     this.agent.endEpisode()
@@ -59,6 +63,7 @@ export class DaySimulation {
       day: this.agent.episode, // After endEpisode, episode is incremented
       action: this.currentAction,
       reward: this.lastReward,
+      market: this.lastSale,
       qValues: this.agent.qtable.getValues(),
       epsilon: this.agent.epsilon
     }
@@ -72,8 +77,19 @@ export class DaySimulation {
     return dayLogEntry
   }
 
-  nextDay() {
+  rest() {
     if (this.state !== 'selling') {
+      throw new Error(`Cannot rest from state: ${this.state}`)
+    }
+
+    this.state = 'resting'
+
+    // Travel home and rest until 8 AM next day (12 hours from 8 PM)
+    this.clock.tick(720)
+  }
+
+  nextDay() {
+    if (this.state !== 'resting') {
       throw new Error(`Cannot start next day from state: ${this.state}`)
     }
 
@@ -84,6 +100,7 @@ export class DaySimulation {
     this.state = 'idle'
     this.currentAction = null
     this.lastReward = null
+    this.lastSale = null
   }
 
   getStatus() {
@@ -92,6 +109,7 @@ export class DaySimulation {
       currentAction: this.currentAction,
       lastReward: this.lastReward,
       day: this.agent.episode,
+      market: this.lastSale,
       clock: this.clock.getTimeString()
     }
   }

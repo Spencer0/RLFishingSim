@@ -12,6 +12,9 @@ export class SceneRenderer {
     this.waterMeshes = []
     this.renderTick = 0
     this.positions = {}
+    this.popEffects = []
+    this.previousState = null
+    this.previousDay = 0
 
     this._createOverlayElements()
     this._initThree()
@@ -209,6 +212,17 @@ export class SceneRenderer {
     sign.position.set(0, 2.4, 7.6)
     this.scene.add(sign)
 
+    // Market crates for visual clarity
+    const crateGeo = new THREE.BoxGeometry(0.7, 0.7, 0.7)
+    const crateMat = new THREE.MeshLambertMaterial({ color: 0xc58f5a })
+    const crate1 = new THREE.Mesh(crateGeo, crateMat)
+    crate1.position.set(-1.6, 0.35, 5.4)
+    this.scene.add(crate1)
+
+    const crate2 = new THREE.Mesh(crateGeo, crateMat)
+    crate2.position.set(1.4, 0.35, 5.3)
+    this.scene.add(crate2)
+
     // Sun accent
     const sunGeometry = new THREE.SphereGeometry(1.2, 24, 24)
     const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffdd76 })
@@ -327,6 +341,79 @@ export class SceneRenderer {
     this.scene.add(this.fisherman)
   }
 
+
+  _createTextSprite(text, color = '#ffffff') {
+    const canvas = document.createElement('canvas')
+    canvas.width = 256
+    canvas.height = 128
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.font = 'bold 54px Inter, Segoe UI Emoji, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillStyle = color
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)'
+    ctx.lineWidth = 6
+    ctx.strokeText(text, canvas.width / 2, canvas.height / 2)
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2)
+
+    const texture = new THREE.CanvasTexture(canvas)
+    const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false })
+    const sprite = new THREE.Sprite(material)
+    sprite.scale.set(1.9, 0.95, 1)
+    return sprite
+  }
+
+  _spawnPopup(text, options = {}) {
+    if (!this.scene || !this.fisherman) return
+
+    const sprite = this._createTextSprite(text, options.color)
+    if (!sprite) return
+
+    const baseOffset = options.baseOffset || new THREE.Vector3(0, 2.6, 0)
+    const randomOffset = new THREE.Vector3(
+      (Math.random() - 0.5) * (options.spreadX || 0.8),
+      Math.random() * (options.spreadY || 0.6),
+      (Math.random() - 0.5) * (options.spreadZ || 0.8)
+    )
+
+    sprite.position.copy(this.fisherman.position).add(baseOffset).add(randomOffset)
+    this.scene.add(sprite)
+
+    this.popEffects.push({
+      sprite,
+      life: 1,
+      riseSpeed: options.riseSpeed || 0.05,
+      driftX: options.driftX || (Math.random() - 0.5) * 0.02,
+      scaleGrow: options.scaleGrow || 0.006
+    })
+  }
+
+  _updatePopEffects() {
+    if (this.popEffects.length === 0) return
+
+    this.popEffects = this.popEffects.filter(effect => {
+      effect.life -= 0.02
+      effect.sprite.position.y += effect.riseSpeed
+      effect.sprite.position.x += effect.driftX
+      effect.sprite.scale.multiplyScalar(1 + effect.scaleGrow)
+
+      if (effect.sprite.material) {
+        effect.sprite.material.opacity = Math.max(0, effect.life)
+      }
+
+      if (effect.life <= 0) {
+        this.scene.remove(effect.sprite)
+        effect.sprite.material?.map?.dispose?.()
+        effect.sprite.material?.dispose?.()
+        return false
+      }
+      return true
+    })
+  }
+
   _handleResize() {
     if (!this.renderer || !this.camera || !this.canvas) return
 
@@ -355,6 +442,8 @@ export class SceneRenderer {
         water.position.y = 0.01 + Math.sin(this.renderTick * (1.4 + idx * 0.2)) * 0.03
       })
 
+      this._updatePopEffects()
+
       // Render the scene
       if (this.renderer && this.scene && this.camera) {
         this.renderer.render(this.scene, this.camera)
@@ -368,6 +457,29 @@ export class SceneRenderer {
   }
 
   render(simStatus, agentState) {
+    if (simStatus.state !== this.previousState) {
+      if (simStatus.state === 'fishing' && simStatus.lastReward !== null && simStatus.lastReward !== undefined) {
+        const fishCount = Math.max(1, Math.min(5, Math.round(simStatus.lastReward / 2)))
+        for (let i = 0; i < fishCount; i++) {
+          this._spawnPopup('🐟', { color: '#9be7ff', baseOffset: new THREE.Vector3(0, 2.2, 0), riseSpeed: 0.045 })
+        }
+      }
+
+      if (simStatus.state === 'selling' && simStatus.market) {
+        const coins = Math.max(2, Math.min(6, Math.round((simStatus.market.revenue || 0) / 6)))
+        for (let i = 0; i < coins; i++) {
+          this._spawnPopup('🪙', { color: '#ffd166', baseOffset: new THREE.Vector3(0, 2.8, 0), riseSpeed: 0.055, spreadX: 1.1 })
+        }
+        this._spawnPopup(`+${(simStatus.market.revenue || 0).toFixed(1)}`, { color: '#ffe066', baseOffset: new THREE.Vector3(0, 3.3, 0), riseSpeed: 0.04, spreadX: 0.2 })
+      }
+
+      if (simStatus.day > this.previousDay) {
+        this._spawnPopup('🧠 +Q', { color: '#b8f2ff', baseOffset: new THREE.Vector3(0, 3.4, 0), riseSpeed: 0.038, spreadX: 0.2 })
+      }
+
+      this.previousState = simStatus.state
+      this.previousDay = simStatus.day
+    }
     // Update fisherman target position based on simulation state
     let targetPos = this.positions.home
 
