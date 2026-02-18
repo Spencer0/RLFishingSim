@@ -5,6 +5,7 @@ import { SimClock } from './sim/clock.js'
 import { DaySimulation } from './sim/day.js'
 import { SceneRenderer } from './ui/canvas.js'
 import { BrainPanel } from './ui/panel.js'
+import { DayLogPanel } from './ui/daylog.js'
 
 console.log('RL Fishing Sim loaded')
 
@@ -16,9 +17,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('main-canvas')
   const panelContainer = document.getElementById('brain-panel')
   const hamburgerBtn = document.getElementById('hamburger-btn')
+  const dayLogBtn = document.getElementById('day-log-btn')
+  const dayLogContainer = document.getElementById('day-log-panel')
   const speedButtons = document.querySelectorAll('.speed-btn')
 
-  if (!canvas || !panelContainer || !hamburgerBtn || speedButtons.length === 0) {
+  if (!canvas || !panelContainer || !hamburgerBtn || !dayLogBtn || !dayLogContainer || speedButtons.length === 0) {
     console.error('Required DOM elements not found')
     return
   }
@@ -44,15 +47,21 @@ document.addEventListener('DOMContentLoaded', () => {
   // Create UI components
   const renderer = new SceneRenderer(canvas)
   const panel = new BrainPanel(panelContainer)
+  const dayLogPanel = new DayLogPanel(dayLogContainer)
 
   // Simulation state
   let simSpeed = 1000 // ms per phase transition
   let lastTransitionTime = 0
   let animationFrameId = null
+  let lastPanelSignature = ''
 
   // Wire up hamburger button
   hamburgerBtn.addEventListener('click', () => {
     panel.toggle()
+  })
+
+  dayLogBtn.addEventListener('click', () => {
+    dayLogPanel.toggle()
   })
 
   // Wire up speed control buttons
@@ -85,6 +94,9 @@ document.addEventListener('DOMContentLoaded', () => {
           simulation.sell()
           break
         case 'selling':
+          simulation.rest()
+          break
+        case 'resting':
           simulation.nextDay()
           break
         default:
@@ -108,13 +120,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add last action and reward to agent state for panel display
     agentState.lastAction = simStatus.currentAction
-    agentState.lastReward = simStatus.lastReward
+    agentState.lastReward = simStatus.market?.revenue ?? simStatus.lastReward
 
-    // Update canvas
+    // Update canvas every frame for smooth travel/visual effects
     renderer.render(simStatus, agentState)
 
-    // Update panel (even if hidden, so it's ready when shown)
-    panel.render(agentState)
+    // Panels only need refresh when meaningful simulation data changes
+    const panelSignature = JSON.stringify({
+      state: simStatus.state,
+      day: simStatus.day,
+      action: simStatus.currentAction,
+      reward: simStatus.lastReward,
+      revenue: simStatus.market?.revenue,
+      epsilon: agentState.epsilon,
+      qValues: agentState.qValues,
+      dayLogLen: simulation.dayLog.length
+    })
+
+    if (panelSignature !== lastPanelSignature) {
+      panel.render(agentState)
+      dayLogPanel.render(simulation.dayLog)
+      lastPanelSignature = panelSignature
+    }
   }
 
   // Animation frame loop
@@ -127,9 +154,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check if enough time has passed for next phase transition
     if (timestamp - lastTransitionTime >= simSpeed) {
       advanceSimulation()
-      updateUI()
       lastTransitionTime = timestamp
     }
+
+    // Keep UI/animation state in sync every frame for smooth travel/effects
+    updateUI()
 
     // Continue the loop
     animationFrameId = requestAnimationFrame(simulationLoop)
@@ -160,6 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
     simulation,
     renderer,
     panel,
+    dayLogPanel,
     startSimulation,
     simSpeed: () => simSpeed
   }

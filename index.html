@@ -28,12 +28,30 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 12px;
     }
 
     h1 {
       color: #4cc9f0;
       margin: 0;
       font-size: 24px;
+    }
+
+
+    .utility-btn {
+      background: #2d3748;
+      color: #dbe7ff;
+      border: 1px solid #4a5568;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .utility-btn:hover {
+      background: #4a5568;
+      color: #fff;
     }
 
     #hamburger-btn {
@@ -56,10 +74,16 @@
       background: #3a56d4;
     }
 
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
     .speed-controls {
       display: flex;
       gap: 8px;
-      margin-right: 15px;
+      margin-right: 6px;
     }
 
     .speed-btn {
@@ -223,21 +247,60 @@
       background: #4cc9f0;
       color: #1a1a2e;
     }
+
+
+    #day-log-panel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: min(460px, 95vw);
+      height: 100%;
+      background: rgba(13, 22, 47, 0.98);
+      color: #e8f2ff;
+      padding: 20px;
+      box-sizing: border-box;
+      overflow-y: auto;
+      transform: translateX(-105%);
+      transition: transform 0.3s ease;
+      z-index: 1000;
+      box-shadow: 2px 0 16px rgba(0, 0, 0, 0.5);
+    }
+
+    #day-log-panel.show {
+      transform: translateX(0);
+    }
+
+    .log-entry {
+      border: 1px solid rgba(76, 201, 240, 0.2);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: rgba(67, 97, 238, 0.08);
+      font-size: 13px;
+    }
+
+    .log-entry strong {
+      color: #80d8ff;
+    }
   </style>
 </head>
 <body>
   <div id="app">
     <div class="header">
       <h1>RL Fishing Simulator</h1>
-      <div class="speed-controls">
-        <button class="speed-btn" data-speed="2000">Slow</button>
-        <button class="speed-btn active" data-speed="1000">Normal</button>
-        <button class="speed-btn" data-speed="200">Fast</button>
+      <div class="header-controls">
+        <div class="speed-controls">
+          <button class="speed-btn" data-speed="2000">Slow</button>
+          <button class="speed-btn active" data-speed="1000">Normal</button>
+          <button class="speed-btn" data-speed="200">Fast</button>
+        </div>
+        <button id="day-log-btn" class="utility-btn" aria-label="Toggle day log panel">📜 Day Log</button>
+        <button id="hamburger-btn" aria-label="Toggle brain panel">☰</button>
       </div>
-      <button id="hamburger-btn" aria-label="Toggle brain panel">☰</button>
     </div>
     <div class="main-content">
       <canvas id="main-canvas"></canvas>
+      <div id="day-log-panel"></div>
       <div id="brain-panel"></div>
     </div>
   </div>

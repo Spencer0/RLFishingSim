@@ -7,7 +7,7 @@ describe('DaySimulation', () => {
 
   beforeEach(() => {
     agent = new FishingAgent({ epsilon: 0.0 }) // Deterministic for testing
-    environment = new FishingEnvironment()
+    environment = new FishingEnvironment({ marketPriceMean: 4, marketPriceStd: 0 })
     sim = new DaySimulation(agent, environment)
   })
 
@@ -43,14 +43,45 @@ describe('DaySimulation', () => {
     expect(sim.lastReward).toBeGreaterThanOrEqual(0)
   })
 
-  it('sell() sets state to selling and pushes to dayLog', () => {
+  it('sell() sets state to selling, computes market sale, and pushes to dayLog', () => {
     sim.start()
     sim.fish()
     const logEntry = sim.sell()
 
     expect(sim.state).toBe('selling')
+    expect(sim.lastSale).toBeTruthy()
+    expect(sim.lastSale).toHaveProperty('fishCaught', sim.lastReward)
+    expect(sim.lastSale).toHaveProperty('pricePerFish', 4)
+    expect(sim.lastSale).toHaveProperty('revenue')
     expect(sim.dayLog).toHaveLength(1)
     expect(sim.dayLog[0]).toBe(logEntry)
+  })
+
+  it('rest() transitions to resting and advances clock to next-day wake time', () => {
+    sim.start()
+    sim.fish()
+    sim.sell()
+
+    sim.rest()
+
+    expect(sim.state).toBe('resting')
+    expect(sim.clock.getTimeString()).toBe('8:00 AM')
+    expect(sim.clock.isWakeTime()).toBe(true)
+  })
+
+  it('nextDay() transitions resting -> idle and clears transient state', () => {
+    sim.start()
+    sim.fish()
+    sim.sell()
+    sim.rest()
+
+    sim.nextDay()
+
+    expect(sim.state).toBe('idle')
+    expect(sim.currentAction).toBeNull()
+    expect(sim.lastReward).toBeNull()
+    expect(sim.lastSale).toBeNull()
+    expect(sim.clock.getTimeString()).toBe('8:00 AM')
   })
 
   it('dayLog entry has all required keys', () => {
@@ -58,13 +89,16 @@ describe('DaySimulation', () => {
     sim.fish()
     const logEntry = sim.sell()
 
-    const expectedKeys = ['day', 'action', 'reward', 'qValues', 'epsilon']
+    const expectedKeys = ['day', 'action', 'reward', 'market', 'qValues', 'epsilon']
     expectedKeys.forEach(key => {
       expect(logEntry).toHaveProperty(key)
     })
 
     expect(logEntry.qValues).toHaveProperty('lake')
     expect(logEntry.qValues).toHaveProperty('river')
+    expect(logEntry.market).toHaveProperty('fishCaught')
+    expect(logEntry.market).toHaveProperty('pricePerFish')
+    expect(logEntry.market).toHaveProperty('revenue')
     expect(typeof logEntry.day).toBe('number')
     expect(['lake', 'river']).toContain(logEntry.action)
     expect(typeof logEntry.reward).toBe('number')
@@ -82,11 +116,12 @@ describe('DaySimulation', () => {
     expect(sim.dayLog[0].day).toBe(initialEpisode + 1)
   })
 
-  it('Running start→fish→sell 50 times fills dayLog with 50 entries', () => {
+  it('Running start→fish→sell→rest→nextDay 50 times fills dayLog with 50 entries', () => {
     for (let i = 0; i < 50; i++) {
       sim.start()
       sim.fish()
       sim.sell()
+      sim.rest()
       sim.nextDay()
     }
 
