@@ -16,7 +16,6 @@ export class SceneRenderer {
     this.previousState = null
     this.previousDay = 0
     this.didShowSellPopup = false
-
     this._createOverlayElements()
     this._initThree()
     this._buildScene()
@@ -460,6 +459,29 @@ export class SceneRenderer {
   }
 
   render(simStatus, agentState) {
+    if (simStatus.state !== this.previousState) {
+      if (simStatus.state === 'fishing' && simStatus.lastReward !== null && simStatus.lastReward !== undefined) {
+        const fishCount = Math.max(1, Math.min(5, Math.round(simStatus.lastReward / 2)))
+        for (let i = 0; i < fishCount; i++) {
+          this._spawnPopup('🐟', { color: '#9be7ff', baseOffset: new THREE.Vector3(0, 2.2, 0), riseSpeed: 0.045 })
+        }
+      }
+
+      if (simStatus.state === 'selling' && simStatus.market) {
+        const coins = Math.max(2, Math.min(6, Math.round((simStatus.market.revenue || 0) / 6)))
+        for (let i = 0; i < coins; i++) {
+          this._spawnPopup('🪙', { color: '#ffd166', baseOffset: new THREE.Vector3(0, 2.8, 0), riseSpeed: 0.055, spreadX: 1.1 })
+        }
+        this._spawnPopup(`+${(simStatus.market.revenue || 0).toFixed(1)}`, { color: '#ffe066', baseOffset: new THREE.Vector3(0, 3.3, 0), riseSpeed: 0.04, spreadX: 0.2 })
+      }
+
+      if (simStatus.day > this.previousDay) {
+        this._spawnPopup('🧠 +Q', { color: '#b8f2ff', baseOffset: new THREE.Vector3(0, 3.4, 0), riseSpeed: 0.038, spreadX: 0.2 })
+      }
+
+      this.previousState = simStatus.state
+      this.previousDay = simStatus.day
+    }
     // Update fisherman target position based on simulation state
     let targetPos = this.positions.home
 
