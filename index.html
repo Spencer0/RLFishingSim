@@ -7,28 +7,206 @@
   <style>
     body {
       margin: 0;
-      padding: 20px;
+      padding: 0;
       font-family: sans-serif;
       background: #1a1a2e;
       color: #eee;
+      height: 100vh;
+      overflow: hidden;
     }
+
     #app {
-      max-width: 1200px;
-      margin: 0 auto;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
     }
+
+    .header {
+      padding: 15px 20px;
+      background: rgba(0, 0, 0, 0.3);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
     h1 {
       color: #4cc9f0;
+      margin: 0;
+      font-size: 24px;
     }
-    canvas {
+
+    #hamburger-btn {
+      background: #4361ee;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      width: 40px;
+      height: 40px;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1001;
+      position: relative;
+    }
+
+    #hamburger-btn:hover {
+      background: #3a56d4;
+    }
+
+    .main-content {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #main-canvas {
+      flex: 1;
       border: 2px solid #4361ee;
       background: #0f3460;
+      display: block;
+    }
+
+    #brain-panel {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 320px;
+      height: 100%;
+      background: #16213e;
+      color: white;
+      padding: 20px;
+      box-sizing: border-box;
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      z-index: 1000;
+      box-shadow: -2px 0 10px rgba(0, 0, 0, 0.5);
+    }
+
+    #brain-panel.show {
+      transform: translateX(0);
+    }
+
+    .panel-section {
+      margin-bottom: 25px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #4cc9f0;
+    }
+
+    .panel-section h2 {
+      color: #4cc9f0;
+      margin-top: 0;
+      margin-bottom: 15px;
+      font-size: 18px;
+    }
+
+    .param-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .param-label {
+      color: #a0a0c0;
+    }
+
+    .param-value {
+      color: #fff;
+      font-weight: 500;
+    }
+
+    .q-value-bar-container {
+      background: #0f3460;
+      height: 20px;
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+
+    .q-value-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #4cc9f0, #4361ee);
+      border-radius: 10px;
+      transition: width 0.3s ease;
+      min-width: 2px;
+    }
+
+    .q-value-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 5px;
+      font-size: 14px;
+    }
+
+    .q-value-label {
+      color: #a0a0c0;
+    }
+
+    .q-value-number {
+      color: #fff;
+      font-family: monospace;
+    }
+
+    .favoring {
+      text-align: center;
+      margin-top: 15px;
+      padding: 8px;
+      background: rgba(76, 201, 240, 0.1);
+      border-radius: 6px;
+      font-weight: bold;
+      color: #4cc9f0;
+      font-size: 14px;
+    }
+
+    .decision-info {
+      background: rgba(67, 97, 238, 0.1);
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 10px;
+    }
+
+    .decision-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .action-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+
+    .action-lake {
+      background: #4361ee;
+      color: white;
+    }
+
+    .action-river {
+      background: #4cc9f0;
+      color: #1a1a2e;
     }
   </style>
 </head>
 <body>
   <div id="app">
-    <h1>RL Fishing Simulator</h1>
-    <div id="game-container"></div>
+    <div class="header">
+      <h1>RL Fishing Simulator</h1>
+      <button id="hamburger-btn" aria-label="Toggle brain panel">☰</button>
+    </div>
+    <div class="main-content">
+      <canvas id="main-canvas"></canvas>
+      <div id="brain-panel"></div>
+    </div>
   </div>
   <script type="module" src="/src/main.js"></script>
 </body>
