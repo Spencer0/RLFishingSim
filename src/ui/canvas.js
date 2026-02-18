@@ -8,6 +8,9 @@ export class SceneRenderer {
     this.renderer = null
     this.fisherman = null
     this.fishermanTarget = null
+    this.fishermanBaseY = 0
+    this.waterMeshes = []
+    this.renderTick = 0
     this.positions = {}
 
     this._createOverlayElements()
@@ -15,89 +18,154 @@ export class SceneRenderer {
     this._buildScene()
     this._buildFisherman()
     this._startRenderLoop()
+
+    this._handleResize = this._handleResize.bind(this)
+    window.addEventListener('resize', this._handleResize)
+    this._handleResize()
   }
 
   _createOverlayElements() {
+    const canvasHost = this.canvas.parentElement || document.body
+    if (canvasHost !== document.body && getComputedStyle(canvasHost).position === 'static') {
+      canvasHost.style.position = 'relative'
+    }
+
     // Create overlay divs if they don't exist
-    const createDiv = (id, styles) => {
+    const createDiv = (id, styles, parent = canvasHost) => {
       let div = document.getElementById(id)
       if (!div) {
         div = document.createElement('div')
         div.id = id
         Object.assign(div.style, styles)
-        document.body.appendChild(div)
+        parent.appendChild(div)
       }
       return div
     }
 
+    const hud = createDiv('overlay-hud', {
+      position: 'absolute',
+      inset: '16px',
+      display: 'grid',
+      gridTemplateColumns: '1fr auto',
+      gridTemplateRows: 'auto 1fr auto',
+      alignItems: 'start',
+      pointerEvents: 'none',
+      zIndex: '30'
+    })
+
+    const cardStyle = {
+      color: '#ebf8ff',
+      fontSize: '1rem',
+      fontFamily: "'Inter', 'Segoe UI', sans-serif",
+      letterSpacing: '0.02em',
+      textShadow: '0 2px 8px rgba(0,0,0,0.45)',
+      backdropFilter: 'blur(10px)',
+      border: '1px solid rgba(255,255,255,0.2)',
+      boxShadow: '0 10px 28px rgba(0, 0, 0, 0.28)',
+      borderRadius: '14px',
+      background: 'linear-gradient(150deg, rgba(22,48,94,0.75), rgba(25,116,210,0.45))',
+      padding: '10px 14px',
+      pointerEvents: 'none'
+    }
+
+    const badgeStyle = {
+      ...cardStyle,
+      position: 'relative',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '8px',
+      fontWeight: '600'
+    }
+
     const overlayStyle = {
-      position: 'fixed',
+      position: 'absolute',
       color: 'white',
-      fontSize: '1.2rem',
-      fontFamily: 'monospace',
-      textShadow: '1px 1px 3px black',
-      zIndex: '10'
+      zIndex: '31',
+      whiteSpace: 'nowrap'
     }
 
     createDiv('overlay-day', {
       ...overlayStyle,
-      top: '20px',
-      left: '50%',
-      transform: 'translateX(-50%)'
-    })
+      ...badgeStyle,
+      justifySelf: 'center',
+      alignSelf: 'start'
+    }, hud)
 
     createDiv('overlay-fish', {
       ...overlayStyle,
-      top: '20px',
-      left: '20px'
-    })
+      ...badgeStyle,
+      justifySelf: 'start',
+      alignSelf: 'start'
+    }, hud)
 
     createDiv('overlay-clock', {
       ...overlayStyle,
-      bottom: '20px',
-      right: '20px'
-    })
+      ...cardStyle,
+      justifySelf: 'end',
+      alignSelf: 'end',
+      fontFamily: "'JetBrains Mono', 'SFMono-Regular', Consolas, monospace",
+      fontWeight: '700'
+    }, hud)
   }
 
   _initThree() {
     // Create renderer
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true })
-    this.renderer.setSize(800, 500)
-    this.renderer.setClearColor(0x87CEEB) // sky blue
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+    this.renderer.setSize(800, 500, false)
+    this.renderer.setClearColor(0x6ba8de)
 
     // Create scene
     this.scene = new THREE.Scene()
 
     // Create camera
-    this.camera = new THREE.PerspectiveCamera(75, 800 / 500, 0.1, 1000)
-    this.camera.position.set(0, 25, 5)
+    this.camera = new THREE.PerspectiveCamera(65, 800 / 500, 0.1, 1000)
+    this.camera.position.set(0, 20, 14)
     this.camera.lookAt(0, 0, 0)
 
     // Add lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.72)
     this.scene.add(ambientLight)
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
-    directionalLight.position.set(10, 20, 10)
+    const directionalLight = new THREE.DirectionalLight(0xfff0d6, 1.2)
+    directionalLight.position.set(12, 24, 12)
     this.scene.add(directionalLight)
+
+    const fillLight = new THREE.DirectionalLight(0x8ec5ff, 0.48)
+    fillLight.position.set(-12, 10, -4)
+    this.scene.add(fillLight)
   }
 
   _buildScene() {
     // Ground
     const groundGeometry = new THREE.PlaneGeometry(40, 20)
-    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x4a7c3f })
+    const groundMaterial = new THREE.MeshLambertMaterial({ color: 0x5ea057 })
     const ground = new THREE.Mesh(groundGeometry, groundMaterial)
     ground.rotation.x = -Math.PI / 2
     ground.position.y = 0
     this.scene.add(ground)
 
+    // Paths
+    const pathGeometry = new THREE.PlaneGeometry(3.5, 12)
+    const pathMaterial = new THREE.MeshLambertMaterial({ color: 0xb69768 })
+    const path = new THREE.Mesh(pathGeometry, pathMaterial)
+    path.rotation.x = -Math.PI / 2
+    path.position.set(0, 0.02, 0.3)
+    this.scene.add(path)
+
     // Lake (plane)
     const lakeGeometry = new THREE.PlaneGeometry(8, 6)
-    const lakeMaterial = new THREE.MeshLambertMaterial({ color: 0x1e90ff })
+    const lakeMaterial = new THREE.MeshPhongMaterial({
+      color: 0x1d74cc,
+      shininess: 100,
+      transparent: true,
+      opacity: 0.92
+    })
     const lake = new THREE.Mesh(lakeGeometry, lakeMaterial)
     lake.rotation.x = -Math.PI / 2
     lake.position.set(-8, 0.01, 2)
     this.scene.add(lake)
+    this.waterMeshes.push(lake)
 
     // Lake sign post
     const postGeometry = new THREE.BoxGeometry(0.5, 2, 0.5)
@@ -108,10 +176,16 @@ export class SceneRenderer {
 
     // River (long box)
     const riverGeometry = new THREE.BoxGeometry(20, 0.1, 2)
-    const riverMaterial = new THREE.MeshLambertMaterial({ color: 0x1e90ff })
+    const riverMaterial = new THREE.MeshPhongMaterial({
+      color: 0x2d89d9,
+      shininess: 120,
+      transparent: true,
+      opacity: 0.85
+    })
     const river = new THREE.Mesh(riverGeometry, riverMaterial)
     river.position.set(4, 0.01, -4)
     this.scene.add(river)
+    this.waterMeshes.push(river)
 
     // Market building
     const marketGeometry = new THREE.BoxGeometry(3, 3, 3)
@@ -125,7 +199,22 @@ export class SceneRenderer {
     const roofMaterial = new THREE.MeshLambertMaterial({ color: 0xcc0000 })
     const roof = new THREE.Mesh(roofGeometry, roofMaterial)
     roof.position.set(0, 3.75, 6)
+    roof.rotation.y = Math.PI / 4
     this.scene.add(roof)
+
+    // Market sign
+    const signGeometry = new THREE.BoxGeometry(1.8, 0.6, 0.1)
+    const signMaterial = new THREE.MeshLambertMaterial({ color: 0xf6d365 })
+    const sign = new THREE.Mesh(signGeometry, signMaterial)
+    sign.position.set(0, 2.4, 7.6)
+    this.scene.add(sign)
+
+    // Sun accent
+    const sunGeometry = new THREE.SphereGeometry(1.2, 24, 24)
+    const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffdd76 })
+    const sun = new THREE.Mesh(sunGeometry, sunMaterial)
+    sun.position.set(-14, 14, -10)
+    this.scene.add(sun)
 
     // Trees (4 decorative trees)
     const treePositions = [
@@ -234,18 +323,37 @@ export class SceneRenderer {
 
     // Set initial position
     this.fisherman.position.copy(this.positions.home)
+    this.fishermanBaseY = this.positions.home.y
     this.scene.add(this.fisherman)
+  }
+
+  _handleResize() {
+    if (!this.renderer || !this.camera || !this.canvas) return
+
+    const width = this.canvas.clientWidth || this.canvas.parentElement?.clientWidth || 800
+    const height = this.canvas.clientHeight || this.canvas.parentElement?.clientHeight || 500
+
+    this.renderer.setSize(width, height, false)
+    this.camera.aspect = width / Math.max(height, 1)
+    this.camera.updateProjectionMatrix()
   }
 
   _startRenderLoop() {
     const animate = () => {
       requestAnimationFrame(animate)
+      this.renderTick += 0.02
 
       // Smoothly interpolate fisherman position toward target
       if (this.fisherman && this.fishermanTarget) {
         this.fisherman.position.lerp(this.fishermanTarget, 0.05)
-        this.fisherman.rotation.y += 0.01 // idle bobbing rotation
+        this.fisherman.rotation.y += 0.01
+        this.fisherman.position.y = this.fishermanBaseY + Math.sin(this.renderTick * 2.5) * 0.08
       }
+
+      // Subtle water motion
+      this.waterMeshes.forEach((water, idx) => {
+        water.position.y = 0.01 + Math.sin(this.renderTick * (1.4 + idx * 0.2)) * 0.03
+      })
 
       // Render the scene
       if (this.renderer && this.scene && this.camera) {
@@ -280,18 +388,18 @@ export class SceneRenderer {
     const clockElement = document.getElementById('overlay-clock')
 
     if (dayElement) {
-      dayElement.textContent = `Day ${simStatus.day}`
+      dayElement.textContent = `📅 Day ${simStatus.day}`
     }
 
     if (fishElement) {
       const fishCount = simStatus.lastReward !== undefined && simStatus.lastReward !== null
         ? Math.round(simStatus.lastReward)
         : 0
-      fishElement.textContent = `🐟 x ${fishCount}`
+      fishElement.textContent = `🎣 Catch: ${fishCount} fish`
     }
 
     if (clockElement) {
-      clockElement.textContent = simStatus.clock
+      clockElement.textContent = `🕒 ${simStatus.clock || '8:00 AM'}`
     }
   }
 }
