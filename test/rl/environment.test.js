@@ -57,6 +57,6 @@ describe('FishingEnvironment', () => {
 
     // At least 99.9% of samples should be within mean ± 4*std
     // This is a statistical test that should pass for normal distribution
-    expect(withinRange / samples).toBeGreaterThan(0.999)
+    expect(withinRange / samples).toBeGreaterThanOrEqual(0.999)
   })
 })
