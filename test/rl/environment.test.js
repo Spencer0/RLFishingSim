@@ -42,6 +42,23 @@ describe('FishingEnvironment', () => {
     expect(riverMean).toBeGreaterThan(lakeMean)
   })
 
+
+  it('sellCatch() returns fishCaught, pricePerFish, and revenue', () => {
+    const sale = env.sellCatch(10)
+
+    expect(sale).toHaveProperty('fishCaught', 10)
+    expect(sale).toHaveProperty('pricePerFish')
+    expect(sale).toHaveProperty('revenue')
+    expect(sale.pricePerFish).toBeGreaterThan(0)
+    expect(sale.revenue).toBeCloseTo(sale.fishCaught * sale.pricePerFish)
+  })
+
+  it('sellCatch() throws for invalid fishCaught values', () => {
+    expect(() => env.sellCatch(-1)).toThrow()
+    expect(() => env.sellCatch(Number.NaN)).toThrow()
+    expect(() => env.sellCatch('bad')).toThrow()
+  })
+
   it('sampleNormal produces values within reasonable range (mean ± 4*std)', () => {
     const mean = 5
     const std = 3

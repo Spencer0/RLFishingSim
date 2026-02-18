@@ -5,6 +5,8 @@ export class FishingEnvironment {
       lakeStd: 3,
       riverMean: 7,
       riverStd: 3,
+      marketPriceMean: 4,
+      marketPriceStd: 1,
       ...config
     };
   }
@@ -40,6 +42,22 @@ export class FishingEnvironment {
       action,
       reward,
       fishCaught: reward
+    };
+  }
+
+  sellCatch(fishCaught) {
+    if (typeof fishCaught !== 'number' || Number.isNaN(fishCaught) || fishCaught < 0) {
+      throw new Error(`Invalid fishCaught value: ${fishCaught}. Must be a non-negative number`);
+    }
+
+    const rawPrice = this.sampleNormal(this.config.marketPriceMean, this.config.marketPriceStd);
+    const pricePerFish = Math.max(0.1, rawPrice);
+    const revenue = fishCaught * pricePerFish;
+
+    return {
+      fishCaught,
+      pricePerFish,
+      revenue
     };
   }
 }

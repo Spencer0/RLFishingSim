@@ -85,6 +85,9 @@ document.addEventListener('DOMContentLoaded', () => {
           simulation.sell()
           break
         case 'selling':
+          simulation.rest()
+          break
+        case 'resting':
           simulation.nextDay()
           break
         default:
@@ -108,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add last action and reward to agent state for panel display
     agentState.lastAction = simStatus.currentAction
-    agentState.lastReward = simStatus.lastReward
+    agentState.lastReward = simStatus.market?.revenue ?? simStatus.lastReward
 
     // Update canvas
     renderer.render(simStatus, agentState)
