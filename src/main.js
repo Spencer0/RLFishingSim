@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let simSpeed = 1000 // ms per phase transition
   let lastTransitionTime = 0
   let animationFrameId = null
+  let lastPanelSignature = ''
 
   // Wire up hamburger button
   hamburgerBtn.addEventListener('click', () => {
@@ -121,12 +122,26 @@ document.addEventListener('DOMContentLoaded', () => {
     agentState.lastAction = simStatus.currentAction
     agentState.lastReward = simStatus.market?.revenue ?? simStatus.lastReward
 
-    // Update canvas
+    // Update canvas every frame for smooth travel/visual effects
     renderer.render(simStatus, agentState)
 
-    // Update panel (even if hidden, so it's ready when shown)
-    panel.render(agentState)
-    dayLogPanel.render(simulation.dayLog)
+    // Panels only need refresh when meaningful simulation data changes
+    const panelSignature = JSON.stringify({
+      state: simStatus.state,
+      day: simStatus.day,
+      action: simStatus.currentAction,
+      reward: simStatus.lastReward,
+      revenue: simStatus.market?.revenue,
+      epsilon: agentState.epsilon,
+      qValues: agentState.qValues,
+      dayLogLen: simulation.dayLog.length
+    })
+
+    if (panelSignature !== lastPanelSignature) {
+      panel.render(agentState)
+      dayLogPanel.render(simulation.dayLog)
+      lastPanelSignature = panelSignature
+    }
   }
 
   // Animation frame loop
@@ -139,9 +154,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check if enough time has passed for next phase transition
     if (timestamp - lastTransitionTime >= simSpeed) {
       advanceSimulation()
-      updateUI()
       lastTransitionTime = timestamp
     }
+
+    // Keep UI/animation state in sync every frame for smooth travel/effects
+    updateUI()
 
     // Continue the loop
     animationFrameId = requestAnimationFrame(simulationLoop)

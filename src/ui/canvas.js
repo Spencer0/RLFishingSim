@@ -15,7 +15,7 @@ export class SceneRenderer {
     this.popEffects = []
     this.previousState = null
     this.previousDay = 0
-
+    this.didShowSellPopup = false
     this._createOverlayElements()
     this._initThree()
     this._buildScene()
@@ -190,37 +190,39 @@ export class SceneRenderer {
     this.scene.add(river)
     this.waterMeshes.push(river)
 
-    // Market building
+    // Market village area (moved farther from home so travel is obvious)
+    const marketCenter = new THREE.Vector3(11, 0, 4)
+
     const marketGeometry = new THREE.BoxGeometry(3, 3, 3)
     const marketMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 })
     const market = new THREE.Mesh(marketGeometry, marketMaterial)
-    market.position.set(0, 1.5, 6)
+    market.position.set(marketCenter.x, 1.5, marketCenter.z)
     this.scene.add(market)
 
     // Market roof (cone)
     const roofGeometry = new THREE.ConeGeometry(2.5, 1.5, 4)
     const roofMaterial = new THREE.MeshLambertMaterial({ color: 0xcc0000 })
     const roof = new THREE.Mesh(roofGeometry, roofMaterial)
-    roof.position.set(0, 3.75, 6)
+    roof.position.set(marketCenter.x, 3.75, marketCenter.z)
     roof.rotation.y = Math.PI / 4
     this.scene.add(roof)
 
     // Market sign
-    const signGeometry = new THREE.BoxGeometry(1.8, 0.6, 0.1)
+    const signGeometry = new THREE.BoxGeometry(2.2, 0.7, 0.15)
     const signMaterial = new THREE.MeshLambertMaterial({ color: 0xf6d365 })
     const sign = new THREE.Mesh(signGeometry, signMaterial)
-    sign.position.set(0, 2.4, 7.6)
+    sign.position.set(marketCenter.x, 2.5, marketCenter.z + 1.7)
     this.scene.add(sign)
 
     // Market crates for visual clarity
     const crateGeo = new THREE.BoxGeometry(0.7, 0.7, 0.7)
     const crateMat = new THREE.MeshLambertMaterial({ color: 0xc58f5a })
     const crate1 = new THREE.Mesh(crateGeo, crateMat)
-    crate1.position.set(-1.6, 0.35, 5.4)
+    crate1.position.set(marketCenter.x - 1.6, 0.35, marketCenter.z - 0.6)
     this.scene.add(crate1)
 
     const crate2 = new THREE.Mesh(crateGeo, crateMat)
-    crate2.position.set(1.4, 0.35, 5.3)
+    crate2.position.set(marketCenter.x + 1.4, 0.35, marketCenter.z - 0.7)
     this.scene.add(crate2)
 
     // Sun accent
@@ -261,7 +263,7 @@ export class SceneRenderer {
       home: new THREE.Vector3(0, 0, 4),
       lake: new THREE.Vector3(-8, 0, 2),
       river: new THREE.Vector3(4, 0, -4),
-      market: new THREE.Vector3(0, 0, 6)
+      market: new THREE.Vector3(11, 0, 4)
     }
 
     // Initialize fisherman target position
@@ -483,15 +485,47 @@ export class SceneRenderer {
     // Update fisherman target position based on simulation state
     let targetPos = this.positions.home
 
-    if (simStatus.state === 'fishing') {
+    if (simStatus.state === 'deciding' || simStatus.state === 'fishing') {
       targetPos = this.positions[simStatus.currentAction] || this.positions.home
     } else if (simStatus.state === 'selling') {
       targetPos = this.positions.market
+    } else if (simStatus.state === 'resting' || simStatus.state === 'idle') {
+      targetPos = this.positions.home
     }
-    // 'deciding', 'idle', default: home
+
+    if (simStatus.state !== this.previousState) {
+      // Fish should pop after fishing is complete (transition into selling)
+      if (simStatus.state === 'selling' && simStatus.lastReward !== null && simStatus.lastReward !== undefined) {
+        const fishCount = Math.max(1, Math.min(5, Math.round(simStatus.lastReward / 2)))
+        for (let i = 0; i < fishCount; i++) {
+          this._spawnPopup('🐟', { color: '#9be7ff', baseOffset: new THREE.Vector3(0, 2.2, 0), riseSpeed: 0.045 })
+        }
+      }
+
+      if (simStatus.day > this.previousDay) {
+        this._spawnPopup('🧠 +Q', { color: '#b8f2ff', baseOffset: new THREE.Vector3(0, 3.4, 0), riseSpeed: 0.038, spreadX: 0.2 })
+      }
+
+      this.didShowSellPopup = false
+      this.previousState = simStatus.state
+      this.previousDay = simStatus.day
+    }
 
     if (this.fishermanTarget) {
       this.fishermanTarget.copy(targetPos)
+    }
+
+    // Sell popups should appear near the market once fisherman arrives there
+    if (simStatus.state === 'selling' && simStatus.market && this.fisherman && !this.didShowSellPopup) {
+      const distToMarket = this.fisherman.position.distanceTo(this.positions.market)
+      if (distToMarket < 1.35) {
+        const coins = Math.max(2, Math.min(6, Math.round((simStatus.market.revenue || 0) / 6)))
+        for (let i = 0; i < coins; i++) {
+          this._spawnPopup('🪙', { color: '#ffd166', baseOffset: new THREE.Vector3(0, 2.8, 0), riseSpeed: 0.055, spreadX: 1.1 })
+        }
+        this._spawnPopup(`+${(simStatus.market.revenue || 0).toFixed(1)}`, { color: '#ffe066', baseOffset: new THREE.Vector3(0, 3.3, 0), riseSpeed: 0.04, spreadX: 0.2 })
+        this.didShowSellPopup = true
+      }
     }
 
     // Update overlay elements
